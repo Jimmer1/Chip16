@@ -6,7 +6,6 @@ main emulator directory.
 import numpy as np
 import sys
 
-
 def high_byte(value: np.uint16) -> np.uint16:
     """
     Given a 16 bit value 0xABCD, returns 0xAB.
@@ -35,6 +34,8 @@ def get_nibble(value: np.uint16, n: int) -> np.uint16:
     """
     return np.uint16((value & (0xF << (4 * n))) >> (4 * n))
 
+def to_hex(string : str) -> int:
+    return int(string, 16)
 
 def is_hex(string: str) -> bool:
     """

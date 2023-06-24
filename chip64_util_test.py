@@ -29,6 +29,9 @@ def test_get_nibble():
     """
     assert c64u.get_nibble(0xABCD, 0) == 0xD
 
+def test_to_hex():
+    assert c64u.to_hex("F") == 0xF
+    assert c64u.to_hex("0xABC") == 0xABC
 
 def test_is_hex():
     """
@@ -52,7 +55,6 @@ def test_split():
         0x78,
         0x9A,
     ]
-
 
 def test_build_uint64():
     """

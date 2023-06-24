@@ -1,7 +1,6 @@
 import chip64 as chip64
 import unittest.mock
 
-
 def test_chip64_execute_RET():
     """
     Tests that the chip64.execute() method calls subroutine_return when a RET code is passed.
@@ -265,55 +264,7 @@ def test_chip64_execute_BAR():
     assert c64.bitwise_and_rand.called
     c64.bitwise_and_rand.assert_called_with(0x5, 0x23)
 
-
-def test_chip64_execute_DRH():
-    """
-    Tests that the chip64.execute() method calls display_register_hex with the correct parameters when a DRH opcode is passed.
-    """
-    code = [0xD3, 0]
-    c64 = chip64.Chip64(code)
-    c64.display_register_hex = unittest.mock.MagicMock()
-    c64.execute(num_of_cycles=1)
-    assert c64.display_register_hex.called
-    c64.display_register_hex.assert_called_with(0x3)
-
-
-def test_chip64_execute_DRD():
-    """
-    Tests that the chip64.execute() method calls display_register_dec with the correct parameters when a DRD opcode is passed.
-    """
-    code = [0xD2, 1]
-    c64 = chip64.Chip64(code)
-    c64.display_register_dec = unittest.mock.MagicMock()
-    c64.execute(num_of_cycles=1)
-    assert c64.display_register_dec.called
-    c64.display_register_dec.assert_called_with(0x2)
-
-
-def test_chip64_execute_DRB():
-    """
-    Tests that the chip64.execute() method calls display_register_bin with the correct parameters when a DRB opcode is passed.
-    """
-    code = [0xDF, 2]
-    c64 = chip64.Chip64(code)
-    c64.display_register_bin = unittest.mock.MagicMock()
-    c64.execute(num_of_cycles=1)
-    assert c64.display_register_bin.called
-    c64.display_register_bin.assert_called_with(0xF)
-
-
-def test_chip64_execute_DRO():
-    """
-    Tests that the chip64.execute() method calls display_register_oct with the correct parameters when a DRO opcode is passed.
-    """
-    code = [0xDD, 3]
-    c64 = chip64.Chip64(code)
-    c64.display_register_oct = unittest.mock.MagicMock()
-    c64.execute(num_of_cycles=1)
-    assert c64.display_register_oct.called
-    c64.display_register_oct.assert_called_with(0xD)
-
-
+    
 def test_chip64_execute_MPAR():
     """
     Tests that the chip64.execute() method calls add_register_to_memory_ptr with the correct parameters when a MPAR opcode is passed.
@@ -349,50 +300,3 @@ def test_chip64_execute_LOAD():
     assert c64.load_registers.called
     c64.load_registers.assert_called_with(0x2)
 
-
-def test_chip64_execute_IRH():
-    """
-    Tests that the chip64.execute() method calls input_register_hex with the correct parameters when a IRH opcode is passed.
-    """
-    code = [0xF3, 0]
-    c64 = chip64.Chip64(code)
-    c64.input_to_register_hex = unittest.mock.MagicMock()
-    c64.execute(num_of_cycles=1)
-    assert c64.input_to_register_hex.called
-    c64.input_to_register_hex.assert_called_with(0x3)
-
-
-def test_chip64_execute_IRD():
-    """
-    Tests that the chip64.execute() method calls input_register_dec with the correct parameters when a IRD opcode is passed.
-    """
-    code = [0xF3, 1]
-    c64 = chip64.Chip64(code)
-    c64.input_to_register_dec = unittest.mock.MagicMock()
-    c64.execute(num_of_cycles=1)
-    assert c64.input_to_register_dec.called
-    c64.input_to_register_dec.assert_called_with(0x3)
-
-
-def test_chip64_execute_IRB():
-    """
-    Tests that the chip64.execute() method calls input_register_bin with the correct parameters when a IRB opcode is passed.
-    """
-    code = [0xF3, 2]
-    c64 = chip64.Chip64(code)
-    c64.input_to_register_bin = unittest.mock.MagicMock()
-    c64.execute(num_of_cycles=1)
-    assert c64.input_to_register_bin.called
-    c64.input_to_register_bin.assert_called_with(0x3)
-
-
-def test_chip64_execute_IRO():
-    """
-    Tests that the chip64.execute() method calls input_register_oct with the correct parameters when a IRO opcode is passed.
-    """
-    code = [0xF3, 3]
-    c64 = chip64.Chip64(code)
-    c64.input_to_register_oct = unittest.mock.MagicMock()
-    c64.execute(num_of_cycles=1)
-    assert c64.input_to_register_oct.called
-    c64.input_to_register_oct.assert_called_with(0x3)

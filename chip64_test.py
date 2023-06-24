@@ -292,54 +292,6 @@ def test_chip64_bitwise_and_rand():
     assert c64.registers[0] == (random.randint(0, 255) & 0xF0)
 
 
-def test_chip64_display_register_hex():
-    """
-    Tests the c64.display_register_hex() method, ensures that the console_output method called.
-    """
-    c64 = chip64.Chip64()
-    c64.registers[0] = 0xDEADBEEF
-    c64u.console_output = unittest.mock.MagicMock()
-    c64.display_register_hex(0)
-    assert c64u.console_output.called
-    c64u.console_output.assert_called_with(hex(0xDEADBEEF))
-
-
-def test_chip64_display_register_dec():
-    """
-    Tests the c64.display_register_dec() method, ensures that the console_output method called.
-    """
-    c64 = chip64.Chip64()
-    c64.registers[0] = 123456789
-    c64u.console_output = unittest.mock.MagicMock()
-    c64.display_register_dec(0)
-    assert c64u.console_output.called
-    c64u.console_output.assert_called_with(str(123456789))
-
-
-def test_chip64_display_register_bin():
-    """
-    Tests the c64.display_register_bin() method, ensures that the console_output method called.
-    """
-    c64 = chip64.Chip64()
-    c64.registers[0] = 0b1001
-    c64u.console_output = unittest.mock.MagicMock()
-    c64.display_register_bin(0)
-    assert c64u.console_output.called
-    c64u.console_output.assert_called_with(bin(0b1001))
-
-
-def test_chip64_display_register_oct():
-    """
-    Tests the c64.display_register_oct() method, ensures that the console_output method called.
-    """
-    c64 = chip64.Chip64()
-    c64.registers[0] = 0o12345
-    c64u.console_output = unittest.mock.MagicMock()
-    c64.display_register_oct(0)
-    assert c64u.console_output.called
-    c64u.console_output.assert_called_with(oct(0o12345))
-
-
 def test_chip64_add_register_to_memory_ptr():
     """
     Tests that the c64.add_register_to_memory_ptr() method, ensures that the memory_ptr is modified correctly.
@@ -351,81 +303,42 @@ def test_chip64_add_register_to_memory_ptr():
     assert c64.memory_ptr == 0x1AB
 
 
-def test_chip64_spill_registers():
-    """
-    Tests the c64.spill_registers() method.
-    """
-    c64 = chip64.Chip64()
-    c64.registers[0] = 0xABCD686
-    c64.registers[1] = 0xCDEF123
-    c64.memory_ptr = 0xFF
-    c64.spill_registers(1)
-    # It is important to make sure that memory_ptr is unchanged first because
-    # the rest of the test depends on this.
-    assert c64.memory_ptr == 0xFF
-    dump1 = c64u.build_uint64([c64.memory[c64.memory_ptr + i] for i in range(8)])
-    dump2 = c64u.build_uint64([c64.memory[c64.memory_ptr + 8 + i] for i in range(8)])
-    assert np.uint64(dump1) == c64.registers[0]
-    assert np.uint64(dump2) == c64.registers[1]
+# def test_chip64_spill_registers():
+#     """
+#     Tests the c64.spill_registers() method.
+#     """
+#     c64 = chip64.Chip64()
+#     c64.registers[0] = 0xABCD686
+#     c64.registers[1] = 0xCDEF123
+#     c64.memory_ptr = 0xFF
+#     c64.spill_registers(1)
+#     # It is important to make sure that memory_ptr is unchanged first because
+#     # the rest of the test depends on this.
+#     assert c64.memory_ptr == 0xFF
+#     dump1 = c64u.build_uint64([c64.memory[c64.memory_ptr + i] for i in range(8)])
+#     dump2 = c64u.build_uint64([c64.memory[c64.memory_ptr + 8 + i] for i in range(8)])
+#     assert np.uint64(dump1) == c64.registers[0]
+#     assert np.uint64(dump2) == c64.registers[1]
 
 
-def test_chip64_load_registers():
-    """
-    Tests the c64.load_registers() method.
-    """
-    c64 = chip64.Chip64()
-    c64.memory_ptr = 0x24
+# def test_chip64_load_registers():
+#     """
+#     Tests the c64.load_registers() method.
+#     """
+#     c64 = chip64.Chip64()
+#     c64.memory_ptr = 0x24
 
-    tmp1 = [0xAB, 0xCD, 0x1E, 0x44, 0xF9, 0xD1, 0xCC, 0x22]
-    tmp2 = [0xFB, 0x19, 0x57, 0xA2, 0xC4, 0xC2, 0xDE, 0x55]
+#     tmp1 = [0xAB, 0xCD, 0x1E, 0x44, 0xF9, 0xD1, 0xCC, 0x22]
+#     tmp2 = [0xFB, 0x19, 0x57, 0xA2, 0xC4, 0xC2, 0xDE, 0x55]
 
-    # load the two byte arrays into memory
-    for i in range(8):
-        c64.memory[0x24 + i] = np.uint8(tmp1[i])
-    for i in range(8):
-        c64.memory[0x24 + 8 + i] = np.uint8(tmp2[i])
+#     # load the two byte arrays into memory
+#     for i in range(8):
+#         c64.memory[0x24 + i] = np.uint8(tmp1[i])
+#     for i in range(8):
+#         c64.memory[0x24 + 8 + i] = np.uint8(tmp2[i])
 
-    c64.load_registers(1)
-    assert c64.registers[0] == 0xABCD1E44F9D1CC22
-    assert c64.registers[1] == 0xFB1957A2C4C2DE55
-    assert c64.memory_ptr == 0x24
+#     c64.load_registers(1)
+#     assert c64.registers[0] == 0xABCD1E44F9D1CC22
+#     assert c64.registers[1] == 0xFB1957A2C4C2DE55
+#     assert c64.memory_ptr == 0x24
 
-
-def test_chip64_input_register_hex():
-    """
-    Tests the c64.input_register_hex() method.
-    """
-    c64 = chip64.Chip64()
-    c64u.console_input = unittest.mock.MagicMock(return_value=hex(0x1234))
-    c64.input_to_register_hex(0)
-    assert c64.registers[0] == 0x1234
-
-
-def test_chip64_input_register_dec():
-    """
-    Tests the c64.input_register_dec() method.
-    """
-    c64 = chip64.Chip64()
-    c64u.console_input = unittest.mock.MagicMock(return_value=123456)
-    c64.input_to_register_dec(0)
-    assert c64.registers[0] == 123456
-
-
-def test_chip64_input_register_bin():
-    """
-    Tests the c64.input_register_bin() method.
-    """
-    c64 = chip64.Chip64()
-    c64u.console_input = unittest.mock.MagicMock(return_value=bin(0b1001))
-    c64.input_to_register_bin(0)
-    assert c64.registers[0] == 0b1001
-
-
-def test_chip64_input_register_oct():
-    """
-    Tests the c64.input_register_oct() method.
-    """
-    c64 = chip64.Chip64()
-    c64u.console_input = unittest.mock.MagicMock(return_value=oct(0o1771))
-    c64.input_to_register_oct(0)
-    assert c64.registers[0] == 0o1771

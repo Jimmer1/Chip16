@@ -1,8 +1,3 @@
-import chip64
-
-code = [
-    # 0xF0, 0x01, # r0 = input()
-    0xF1, 0x01, # r1 = input()
     0x62, 0x00, # total = 0
     0x63, 0x00, # r3 = 0
 #loop_top
@@ -14,9 +9,5 @@ code = [
     0x81, 0x1E, # r1 <<= 1
     0x73, 0x01, # r3 += 1
     0x10, 0X08, # goto loop_top
-# loop_end
-    # 0xD0, 0x01  # print(total)
-]
 
-if __name__ == "__main__":
-    chip64.Chip64(code).execute()
+acr r2, 0x0 # total = 0

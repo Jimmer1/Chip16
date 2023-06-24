@@ -51,6 +51,7 @@ There are two opcodes for assigning values to registers.
 
 AR - 8XY0  
 ACR - 6XNN  
+XCH - 8XYF
 
 AR copies the value from register Y into register X. This is demonstrated below:
 
@@ -70,17 +71,19 @@ code = [
 ]
 ```
 
+XCH exchanges the values of rX and rY.
+
 ### How to perform numeric arithmetic.
 
 There are four opcodes for adding and subtraction operations:
 
 Mnemonic - Opcode  
-ADCR - 7XNN  
+ADC - 7XNN  
 ADD - 8XY4  
 SUB - 8XY5  
 RSUB - 8XY7  
 
-ADCR adds value NN to register X, without modifying the carry register, this is demonstrated below:
+ADC adds value NN to register X, without modifying the carry register, this is demonstrated below:
 
 ```python
 code = [
@@ -239,11 +242,14 @@ code = [
 
 There are two opcodes for calling and returning from subroutines:
 
-Mnemonic - Opcode  
-RET - 01EE  
-CALL - 2NNN  
+Mnemonic - Opcode
+RET - 01EE
+CALL - 2NNN
+CALLR - EX1C
 
 CALL calls the subroutine at address NNN, CALL pushes the code pointer onto the top of the stack then sets the code pointer to NNN.
+
+CALLR calls the subroutine at address rX.
 
 RET returns from the current current subroutine. This instruction sets the code pointer to the to value held at the top of the call stack then pops the call stack.
 
@@ -262,29 +268,61 @@ code = [
 ]
 ```
 
+### Using Devices.
+
+A key feature of the Chip16 VM is the ability to use Devices. Devices are modular extensions to the Chip16 architecture which
+implement additional functionality to enable the user to write more complex programs.
+
+The basic interface of a Device consists of 4 operations:
+    - Writing data to the Device.
+    - Reading data from the Device.
+    - Setting the Device's internal pointer.
+    - Getting the Device's internal pointer.
+
+This is the basic interface, what each operation does is defined by the device itself.
+
+Any given instance of the Chip16 VM can support a maximum of 16 devices.
+A number of standard devices are provided. They are as follows:
+    - ConsoleIO Device:
+        A device to allow the programmer to accept user input and output through the terminal.
+        The read operation reads n bytes from the console in the format specified by the format code.
+        The write operation prints the range of bytes to the console in a big endian format in the format specified by the format code.
+        The set pointer operation sets the format code to the value held in rF.
+        The get pointer operation stores the format code in rF.
+        The format code sets i/o to be either textual if it's 0 and hexadecimal if it's 1.
+        The ConsoleIO Device is available by default at index 0.
+    - Memory Extension Device:
+        A device to allow the VM to have access to an extra 64k of memory.
+    - Rom Device:
+        Allows the programmer to read data from the file rom.crm up to a limit of 64k, cannot write to that file.
+    - Floating Point Device:
+        Implements 32 bit floating point arithmetic.
+
+There are 4 opcodes for interacting with Devices:
+
+Mnemonic - Opcode  
+WRITE - DXNN  
+READ - FXNN  
+DPS - 0xEX00  
+DPG - 0xEX01  
+
+WRB writes NN bytes to Device X from the memory pointed to by memory_ptr.
+RDB reads NN bytes from Device X to the memory pointed to by memory_ptr.
+DPS - sets Device X's pointer to the value held in rF.
+DPG - sets rF to Device X's internal pointer.
+
 ### How to input and output from the console.
 
-I/O opcodes come in a slightly different format. They come in the format:
+Using the console I/O Device shall be demonstrated below:
 
-GX0Q
-
-where G encodes the operation, either a console input or output, X encodes the source register and Q encodes the data encoding. Q may take one of four values which correspond to the format in which the data is input or output. These are enumerated below:
-
-Q - format  
-0 - hexadecimal (base 16)  
-1 - decimal (base 10)  
-2 - binary (base 2)  
-3 - octal (base 8)  
-
-if G is 0xD then the value in register X is printed in the format dictated by the Q code.
-if G is 0xF then a value in the format dictated by the Q code is read from the console and written to register X.
-
-These are demonstrated below:
+We shall print the value held in register 0 in hex.
 
 ```python
 code = [
-    0xF0, 0x1, # reads a decimal number from console input and writes this to register[0]
-    0xD0, 0x2  # prints register[0] to the console in binary format
+    0xAA, 0xBC # memory_ptr = 0xABC
+    0xE0, 0x55 # *memory_ptr = r0
+    0xE0, 0x00 # set console to format in hex
+    0xD0, 0x02 # print the two bytes representing r0
 ]
 ```
 
@@ -310,9 +348,10 @@ There are four opcodes for reading and writing to memory:
 
 Mnemonic - Opcode  
 SMP - ANNN  
+RMP - EX1D
 MPAR - EX1E  
-SPILL - EX55  
-LOAD - EX65  
+SPL - EX55  
+LD - EX65  
 
 SMP sets the memory address to constant NNN. This is demonstrated below:
 
@@ -322,6 +361,8 @@ code = [
 ]
 ```
 
+RMP sets register X to the value of memory ptr.
+
 MPAR increments the memory pointer by the value held in register X. This is demonstrated below:
 
 ```python
@@ -330,19 +371,19 @@ code = [
 ]
 ```
 
-SPILL writes the contents of register 0 to register X inclusive to memory, writing the value held in register 0 first and register X last. Data is written in a big endian format from the memory pointer without modifying the memory pointer. This is demonstrated below:
+SPL writes the contents of register X to memory. Data is written in a big endian format from the memory pointer without modifying the memory pointer. This is demonstrated below:
 
 ```python
 code = [
-    0xE5, 0x55 # write registers 0 ... 5 inclusive to memory.
+    0xE5, 0x55 # write register 5 to memory.
 ]
 ```
 
-LOAD reads from the memory pointed to by the memory pointer and writes these data to registers 0 to X inclusive. Data is read in a big endian format from register 0 first to register X last. This is demonstrated below:
+LD reads from the memory pointed to by the memory pointer and writes these data to registers 0 to X inclusive. Data is read in a big endian format from register 0 first to register X last. This is demonstrated below:
 
 ```python
 code = [
-    0xE6, 0x65 # load from memory pointer to registers 0 to 6 inclusive.
+    0xE6, 0x65 # load from memory pointer to register 6.
 ]
 ```
 
@@ -350,13 +391,18 @@ code = [
 
 Upon encountering a 0000 opcode, the program will terminate. This opcode is represented by the HALT mnemonic.
 
+### Illegal Opcodes
+
+If an opcode is encountered which isn't does not encode a valid instruction, then an alert is raised.
+The VM will continue execution as normal but the alert flag is raised.
+
 ## Explanation
 
 ### Chip64 Architectural Specification
 
 The architecture is detailed below:
 
- - 16 64-bit registers
+ - 16 16-bit registers
  - 1 12-bit program counter
  - 1 12-bit memory pointer
  - 4096 byte address space

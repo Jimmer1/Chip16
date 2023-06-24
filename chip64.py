@@ -1,4 +1,5 @@
-import chip64_util as c64u
+import chip64_util as c16u
+import chip16_device as c16d
 import numpy as np
 import itertools as itt
 import warnings
@@ -10,6 +11,11 @@ import random
 # prevents this.
 warnings.filterwarnings("ignore")
 
+deviceList = [
+    c16d.ConsoleIO()
+]
+
+defaultDevices = deviceList + [None]*(16 - len(deviceList))
 
 class Chip64:
     """
@@ -19,18 +25,21 @@ class Chip64:
     instructions that do numerical i/o in various formats.
     """
 
-    def __init__(self, code=[]):
+    def __init__(self, code=[], devices=defaultDevices):
         """
         The default constructor for the class.
         """
         self.memory = [np.uint8(0) for _ in range(4096)]
-        self.registers = [np.uint64(0) for _ in range(16)]
+        self.registers = [np.uint16(0) for _ in range(16)]
         self.stack = []
         self.code_ptr = 0
         self.memory_ptr = 0
+        self.alert = False
 
         for i, byte in enumerate(code):
             self.memory[i] = byte
+        
+        self.devices = devices
 
     def reset(self):
         """
@@ -144,12 +153,8 @@ class Chip64:
         Adds registers X and Y together and sets carry flag if needed.
         """
         tmp = self.registers[dest_index] + self.registers[src_index]
-        if tmp < self.registers[dest_index]:
-
-            self.registers[0xF] = np.uint64(1)
-        else:
-            self.registers[0xF] = np.uint64(0)
-        self.registers[dest_index] = np.uint64(tmp)
+        self.registers[0xF] = np.uint16(tmp < self.registers[dest_index])
+        self.registers[dest_index] = np.uint16(tmp)
 
     def subtract_registers(self, dest_index: np.uint16, src_index: np.uint16) -> None:
         """
@@ -157,10 +162,7 @@ class Chip64:
         Subtracts registers X and Y together and sets the flag register if
         there was no borrow.
         """
-        if self.registers[dest_index] >= self.registers[src_index]:
-            self.registers[0xF] = np.uint64(1)
-        else:
-            self.registers[0xF] = np.uint64(0)
+        self.registers[0xF] = np.uint16(self.registers[dest_index] >= self.registers[src_index])
         self.registers[dest_index] -= self.registers[src_index]
 
     def bitwise_right_shift(self, dest_index: np.uint16, src_value: np.uint16) -> None:
@@ -220,41 +222,9 @@ class Chip64:
         Implements the CXNN opcode.
         sets registers[dest_index] to randint(0, 255) & constant.
         """
-        self.registers[dest_index] = np.uint64(random.randint(0, 255)) & np.uint64(
+        self.registers[dest_index] = np.uint16(random.randint(0, 255)) & np.uint64(
             constant
         )
-
-    def display_register_hex(self, register_index: np.uint16) -> None:
-        """
-        Implements the DX00 opcode.
-        Prints the contents of the register_index register to the console in
-        hexadecimal.
-        """
-        c64u.console_output(hex(self.registers[register_index]))
-
-    def display_register_dec(self, register_index: np.uint16) -> None:
-        """
-        Implements the DX01 opcode.
-        Prints the contents of the register_index register to the console in
-        decimal.
-        """
-        c64u.console_output(str(self.registers[register_index]))
-
-    def display_register_bin(self, register_index: np.uint16) -> None:
-        """
-        Implements the DX02 opcode.
-        Prints the contents of the register_index register to the console in
-        binary.
-        """
-        c64u.console_output(bin(self.registers[register_index]))
-
-    def display_register_oct(self, register_index: np.uint16) -> None:
-        """
-        Implements the DX03 opcode.
-        Prints the contents of the register_index register to the console in
-        octal.
-        """
-        c64u.console_output(oct(self.registers[register_index]))
 
     def add_register_to_memory_ptr(self, register_index: np.uint16) -> None:
         """
@@ -263,64 +233,28 @@ class Chip64:
         """
         self.memory_ptr += self.registers[register_index]
 
-    def spill_registers(self, register_index: np.uint16) -> None:
+    def spill_register(self, register_index: np.uint16) -> None:
         """
         Implements the EX55 opcode.
-        Writes the contents of registers 0 to register_index inclusive to
+        Writes the contents of register register_index to
         the memory pointed to by memory_ptr in a big endian manner. Without
         modifying memory_ptr.
         """
         ptr = self.memory_ptr
-        # use register_index+1 because islice iterates over range [start, stop)
-        for register in itt.islice(self.registers, register_index + 1):
-            tmp = c64u.split(register)
-            for i in range(8):  # register is 8 bytes wide
-                self.memory[ptr] = np.uint8(tmp[i])
-                ptr += 1
+        tmp = c16u.split(self.registers[register_index])
+        for i in range(2):  # register is 8 bytes wide
+            self.memory[ptr] = np.uint8(tmp[i])
+            ptr += 1
 
     def load_registers(self, register_index: np.uint16) -> None:
         """
         Implements the EX65 opcode.
-        Fills the registers 0 to register_index inclusive from the memory
+        Fills the register register_index from the memory
         pointed to by memory_ptr in a big endian manner without modifying
         memory_ptr.
         """
-        for register in range(register_index + 1):
-            # 8 being the width of a register in bytes.
-            tmp_bytes = [self.memory[self.memory_ptr + 8*register + i] for i in range(8)]
-            self.registers[register] = c64u.build_uint64(tmp_bytes)
-
-    def input_to_register_hex(self, register_index: np.uint16) -> None:
-        """
-        Implements the FX00 opcode.
-        Takes input from the console and places it into the register indicated
-        by register_index. Input is expected in hexadecimal
-        """
-        self.registers[register_index] = np.uint64(int(c64u.console_input(">"), 16))
-
-    def input_to_register_dec(self, register_index: np.uint16) -> None:
-        """
-        Implements the FX01 opcode.
-        Takes input from the console and places it into the register indicated
-        by register_index. Input is expected in decimal
-        """
-        self.registers[register_index] = np.uint64(int(c64u.console_input(">")))
-
-    def input_to_register_bin(self, register_index: np.uint16) -> None:
-        """
-        Implements the FX02 opcode.
-        Takes input from the console and places it into the register indicated
-        by register_index. Input is expected in binary
-        """
-        self.registers[register_index] = np.uint64(int(c64u.console_input(">"), 2))
-
-    def input_to_register_oct(self, register_index: np.uint16) -> None:
-        """
-        Implements the FX03 opcode.
-        Takes input from the console and places it into the register indicated
-        by register_index. Input is expected in octal
-        """
-        self.registers[register_index] = np.uint64(int(c64u.console_input(">"), 8))
+        tmp_bytes = [self.memory[self.memory_ptr + i] for i in range(2)]
+        self.registers[register] = c16u.build_uint64(tmp_bytes)
 
     def execute(self, num_of_cycles=None) -> None:
         """
@@ -329,7 +263,7 @@ class Chip64:
         If no parameter is passed then the emulator will cycle indefinitely.
         """
         while num_of_cycles is None or num_of_cycles > 0:
-            opcode = c64u.concat(
+            opcode = c16u.concat(
                 self.memory[self.code_ptr], self.memory[self.code_ptr + 1]
             )
 
@@ -341,9 +275,8 @@ class Chip64:
                 return
             elif opcode == 0x01EE:
                 self.subroutine_return()
-                code_ptr_increment_flag = True
 
-            nib3 = c64u.get_nibble(opcode, 3)
+            nib3 = c16u.get_nibble(opcode, 3)
             if nib3 == 1:
                 self.goto(opcode & np.uint16(0xFFF))
                 code_ptr_increment_flag = False
@@ -352,65 +285,65 @@ class Chip64:
                 code_ptr_increment_flag = False
             elif nib3 == 3:
                 self.skip_next_if_equal_const(
-                    c64u.get_nibble(opcode, 2), c64u.low_byte(opcode)
+                    c16u.get_nibble(opcode, 2), c16u.low_byte(opcode)
                 )
             elif nib3 == 4:
                 self.skip_next_if_unequal_const(
-                    c64u.get_nibble(opcode, 2), c64u.low_byte(opcode)
+                    c16u.get_nibble(opcode, 2), c16u.low_byte(opcode)
                 )
             elif nib3 == 5:
                 self.skip_next_if_equal(
-                    c64u.get_nibble(opcode, 2), c64u.get_nibble(opcode, 1)
+                    c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
                 )
             elif nib3 == 6:
                 self.assign_const_to_register(
-                    c64u.get_nibble(opcode, 2), c64u.low_byte(opcode)
+                    c16u.get_nibble(opcode, 2), c16u.low_byte(opcode)
                 )
             elif nib3 == 7:
                 self.add_const_to_register(
-                    c64u.get_nibble(opcode, 2), c64u.low_byte(opcode)
+                    c16u.get_nibble(opcode, 2), c16u.low_byte(opcode)
                 )
             elif nib3 == 8:
-                nib0 = c64u.get_nibble(opcode, 0)
+                nib0 = c16u.get_nibble(opcode, 0)
                 if nib0 == 0:
                     self.assign_register(
-                        c64u.get_nibble(opcode, 2), c64u.get_nibble(opcode, 1)
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
                     )
                 elif nib0 == 1:
                     self.bitwise_or(
-                        c64u.get_nibble(opcode, 2), c64u.get_nibble(opcode, 1)
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
                     )
                 elif nib0 == 2:
                     self.bitwise_and(
-                        c64u.get_nibble(opcode, 2), c64u.get_nibble(opcode, 1)
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
                     )
                 elif nib0 == 3:
                     self.bitwise_xor(
-                        c64u.get_nibble(opcode, 2), c64u.get_nibble(opcode, 1)
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
                     )
                 elif nib0 == 4:
                     self.add_registers(
-                        c64u.get_nibble(opcode, 2), c64u.get_nibble(opcode, 1)
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
                     )
                 elif nib0 == 5:
                     self.subtract_registers(
-                        c64u.get_nibble(opcode, 2), c64u.get_nibble(opcode, 1)
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
                     )
                 elif nib0 == 6:
                     self.bitwise_right_shift(
-                        c64u.get_nibble(opcode, 2), c64u.get_nibble(opcode, 1)
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
                     )
                 elif nib0 == 7:
                     self.subtract_registers(
-                        c64u.get_nibble(opcode, 1), c64u.get_nibble(opcode, 2)
+                        c16u.get_nibble(opcode, 1), c16u.get_nibble(opcode, 2)
                     )
                 elif nib0 == 0xE:
                     self.bitwise_left_shift(
-                        c64u.get_nibble(opcode, 2), c64u.get_nibble(opcode, 1)
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
                     )
             elif nib3 == 9:
                 self.skip_next_if_unequal(
-                    c64u.get_nibble(opcode, 2), c64u.get_nibble(opcode, 1)
+                    c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
                 )
             elif nib3 == 0xA:
                 self.set_memory_ptr(opcode & np.uint16(0xFFF))
@@ -418,34 +351,30 @@ class Chip64:
                 self.set_code_ptr_to_acc_plus_const(opcode & np.uint16(0xFFF))
                 code_ptr_increment_flag = False
             elif nib3 == 0xC:
-                self.bitwise_and_rand(c64u.get_nibble(opcode, 2), c64u.low_byte(opcode))
+                self.bitwise_and_rand(c16u.get_nibble(opcode, 2), c16u.low_byte(opcode))
             elif nib3 == 0xD:
-                nib0 = c64u.get_nibble(opcode, 0)
-                if nib0 == 0:
-                    self.display_register_hex(c64u.get_nibble(opcode, 2))
-                elif nib0 == 1:
-                    self.display_register_dec(c64u.get_nibble(opcode, 2))
-                elif nib0 == 2:
-                    self.display_register_bin(c64u.get_nibble(opcode, 2))
-                elif nib0 == 3:
-                    self.display_register_oct(c64u.get_nibble(opcode, 2))
+                device = c16u.get_nibble(opcode, 2)
+                values = self.devices[device].read(c16u.low_byte(opcode))
+                for ptr, value in zip(self.memory[self.memory_ptr: self.memory_ptr + len(values)], values):
+                    ptr = value
             elif nib3 == 0xE:
-                if c64u.low_byte(opcode) == 0x1E:
-                    self.add_register_to_memory_ptr(c64u.get_nibble(opcode, 2))
-                elif c64u.low_byte(opcode) == 0x55:
-                    self.spill_registers(c64u.get_nibble(opcode, 2))
-                elif c64u.low_byte(opcode) == 0x65:
-                    self.load_registers(c64u.get_nibble(opcode, 2))
+                if c16u.low_byte(opcode) == 0x0:
+                    device = c16u.get_nibble(opcode, 2)
+                    self.devices[device].set_ptr(self.registers[0xF])
+                elif c16u.low_byte(opcode) == 0x1:
+                    device = c16u.get_nibble(opcode, 2)
+                    self.registers[0xF] = self.devices[device].get_ptr()
+                if c16u.low_byte(opcode) == 0x1E:
+                    self.add_register_to_memory_ptr(c16u.get_nibble(opcode, 2))
+                elif c16u.low_byte(opcode) == 0x55:
+                    self.spill_registers(c16u.get_nibble(opcode, 2))
+                elif c16u.low_byte(opcode) == 0x65:
+                    self.load_registers(c16u.get_nibble(opcode, 2))
             elif nib3 == 0xF:
-                nib0 = c64u.get_nibble(opcode, 0)
-                if nib0 == 0:
-                    self.input_to_register_hex(c64u.get_nibble(opcode, 2))
-                elif nib0 == 1:
-                    self.input_to_register_dec(c64u.get_nibble(opcode, 2))
-                elif nib0 == 2:
-                    self.input_to_register_bin(c64u.get_nibble(opcode, 2))
-                elif nib0 == 3:
-                    self.input_to_register_oct(c64u.get_nibble(opcode, 2))
+                device = c16u.get_nibble(opcode, 2)
+                values = self.memory[self.memory_ptr: self.memory_ptr + c16u.low_byte(opcode)]
+                self.devices[device].write(values)
+                nib0 = c16u.get_nibble(opcode, 0)
 
             if code_ptr_increment_flag:
                 self.code_ptr += 2

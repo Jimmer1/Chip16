@@ -1,5 +1,5 @@
 import chip64
-code = [
+code1 = [
 # data section
     0x10, 0x0A, # jump to main
 # 4 million $2
@@ -38,5 +38,10 @@ code = [
     0xD2, 0x01, # print(total)
     0x00, 0x00  # halt execution
 ]
+
+code2 = [
+    
+]
+
 c64 = chip64.Chip64(code)
 c64.execute()
