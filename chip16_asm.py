@@ -4,6 +4,39 @@ import sys
 
 register_mnemonics = ["r" + hex(i)[2:].upper() for i in range(16)]
 device_mnemonics = ["dev" + hex(i)[2:].upper() for i in range(16)]
+opcode_mnemonics = [
+    "adc",
+    "add",
+    "and",
+    "ar",
+    "acr",
+    "bar",
+    "call",
+    "cpac",
+    "dpg",
+    "dps",
+    "goto",
+    "hlt",
+    "ld",
+    "mpar",
+    "or",
+    "rdb",
+    "ret",
+    "rmp",
+    "rsub",
+    "shl",
+    "shr",
+    "smp",
+    "snec",
+    "snuec",
+    "sne",
+    "snue",
+    "spl",
+    "sub",
+    "wrb",
+    "xch",
+    "xor"
+]
 
 def tokenise(source_code : str) -> list:
     tokens = []
@@ -21,7 +54,7 @@ def tokenise(source_code : str) -> list:
 
         if char.isalnum() or char == "_":
             str_buffer.append(char)
-        elif char.isspace() or char in ",:":
+        elif char.isspace() or char in ",:.":
             if str_buffer != []:
                 tokens.append("".join(str_buffer))
             str_buffer = []
@@ -77,8 +110,13 @@ class Assembler:
         self.token_index = 0
         self.opcodes = []
         self.out_file = out_file
+        self.ctk = self.tokens[self.token_index]
 
 # private implementation functions.
+
+    def next_token(self):
+        self.ctk = self.tokens[self.token_index]
+
     def assemble_r2r(self, op1, op2):
         self.token_index += 1
         if self.tokens[self.token_index] not in register_mnemonics:
@@ -104,18 +142,21 @@ class Assembler:
                     opcode = build_opcode((op1, v))
                     self.opcodes.append(opcode)
                     break
-            else:
-                # The symbol was encountered earlier as a goto argument.
-                # Write to the symbol table the location of this goto so that we can fill it in later
-                # when we have an address.
-                self.symbol_table[
-                    self.tokens[self.token_index]
-                ].append(
-                    ("goto", np.uint16(2*len(self.opcodes)+2))
-                )
-                # Write to memory a blank goto instruction which we will fill out the destination field later.
-                opcode = build_opcode((op1, 0x000))
-                self.opcodes.append(opcode)
+                elif t == "goto":
+                    # The symbol was encountered earlier as a goto argument.
+                    # Write to the symbol table the location of this goto so that we can fill it in later
+                    # when we have an address.
+                    self.symbol_table[
+                        self.tokens[self.token_index]
+                    ].append(
+                        ("goto", np.uint16(2*len(self.opcodes)+2))
+                    )
+                    # Write to memory a blank goto instruction which we will fill out the destination field later.
+                    opcode = build_opcode((op1, 0x000))
+                    self.opcodes.append(opcode)
+                else:
+                    # t is a directive, not relevant so do nothing.
+                    pass
             return
 
         else:
@@ -142,6 +183,34 @@ class Assembler:
         dev = dev_tk_int(self.tokens[self.token_index])
         opcode = build_opcode((0xE, dev, op))
         self.opcodes.append(opcode)
+        return
+    
+    def assemble_dir(self):
+        self.next_token()
+        if self.ctk in self.symbol_table:
+            # encountered by an earlier smp op.
+            value = self.symbol_table[self.ctk][1]
+            self.next_token()
+            if not c16u.is_hex(self.ctk):
+                raise SyntaxError()
+            # Write the address of the current top of opcode stack to the opcode of the previous 
+            self.opcodes[value] &= np.uint16(0xF000)
+            self.opcodes[value] |= np.uint16(c16u.to_hex(self.ctk))
+        else:
+            assert (
+                self.ctk not in register_mnemonics
+                    and self.ctk not in device_mnemonics
+                    and self.ctk not in opcode_mnemonics
+                    and self.ctk not in self.symbol_table
+            )
+            label = self.ctk
+            self.next_token()
+            if not c16u.is_hex(self.ctk):
+                raise SyntaxError()
+            segments = c16u.to_words(c16u.to_hex(self.ctk))
+            self.symbol_table[self.ctk] = [("data", 2*len(self.opcodes))]
+            for segment in segments:
+                self.opcodes.append(segment)
         return
     
     def assemble_drw(self, op1):
@@ -280,7 +349,10 @@ class Assembler:
         self.assemble_shift(0x8, 0x6)
 
     def assemble_smp(self):
-        self.assemble_const(0xA)
+        if c16u.is_hex(self.tokens[self.token_index + 1]):
+            self.assemble_const(0xA)
+        elif self.tokens[self.token_index + 1].isalnum():
+            self.assemble_label_op(0xA)
 
     def assemble_snec(self):
         self.assemble_rconst(0x3)
@@ -379,11 +451,13 @@ class Assembler:
             else:
                 if self.tokens[self.token_index + 1] == ":":
                     self.assemble_label()
+                elif self.tokens[self.token_index] == ".":
+                    self.assemble_dir()
                 else:
                     print(self.tokens[self.token_index])
                     raise SyntaxError()
             self.token_index += 1
-        self.opcodes[0] = 2*len(self.opcodes) - 2
+        self.opcodes[0] = np.uint16(2*len(self.opcodes) - 2)
 
     def write_out(self):
         with open(self.out_file, "wb") as of:

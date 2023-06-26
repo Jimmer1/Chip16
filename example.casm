@@ -1,0 +1,31 @@
+INCREMENT:
+adc r0, 0x1
+ret
+
+LOOP_TOP:
+add r0, r1
+# add r1 to r0
+add r2, r3
+goto LOOP_TOP
+ar r0, rF
+sub r2, r3
+rsub rD, rC
+or rA, rB
+and r6, r1
+xor r7, r9
+shr r0, 0x1
+shl r2, 0xF
+
+acr r0, 0x0
+cpac 0x01C
+acr r1, 0x0
+snec r1, 0x00
+ar rD, rF
+snuec r1, 0x01
+ar rD, rF
+acr r0, 0x0
+sne r0, r1
+ar rD, rF
+acr r0, 0x1
+snue r1, r0
+acr rF, 0x1

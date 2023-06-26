@@ -39,9 +39,6 @@ code1 = [
     0x00, 0x00  # halt execution
 ]
 
-code2 = [
-    
-]
 
 c64 = chip64.Chip64(code)
 c64.execute()

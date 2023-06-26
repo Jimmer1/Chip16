@@ -50,7 +50,7 @@ def is_hex(string: str) -> bool:
 
 def split(value: np.uint64) -> list:
     """
-    Splits a numerical value into it's composite bytes and returns them in a
+    Splits a numerical value into its composite bytes and returns them in a
     big endian manner.
     """
     rv = [np.uint8(0) for _ in range(8)]
@@ -59,6 +59,15 @@ def split(value: np.uint64) -> list:
         value >>= np.uint16(8)
     return list(reversed(rv))
 
+def to_words(value : int) -> list:
+    """
+    Splits an integer into its composite words and returns them in big endian manner.
+    """
+    rv = []
+    while value > 0:
+        rv.append(np.uint16(value & np.uint16(0xFFFF)))
+        value >>= np.uint16(16)
+    return list(reversed(rv))
 
 def build_uint64(byte_list: list) -> np.uint64:
     """
