@@ -4,39 +4,6 @@ import sys
 
 register_mnemonics = ["r" + hex(i)[2:].upper() for i in range(16)]
 device_mnemonics = ["dev" + hex(i)[2:].upper() for i in range(16)]
-opcode_mnemonics = [
-    "adc",
-    "add",
-    "and",
-    "ar",
-    "acr",
-    "bar",
-    "call",
-    "cpac",
-    "dpg",
-    "dps",
-    "goto",
-    "hlt",
-    "ld",
-    "mpar",
-    "or",
-    "rdb",
-    "ret",
-    "rmp",
-    "rsub",
-    "shl",
-    "shr",
-    "smp",
-    "snec",
-    "snuec",
-    "sne",
-    "snue",
-    "spl",
-    "sub",
-    "wrb",
-    "xch",
-    "xor"
-]
 
 def tokenise(source_code : str) -> list:
     tokens = []
@@ -51,10 +18,13 @@ def tokenise(source_code : str) -> list:
         elif comment_flag and char == '\n':
             comment_flag = False
             continue
+        
+        # if char == "\n":
+        #     continue
 
         if char.isalnum() or char == "_":
             str_buffer.append(char)
-        elif char.isspace() or char in ",:.":
+        elif char.isspace() or char in ",:":
             if str_buffer != []:
                 tokens.append("".join(str_buffer))
             str_buffer = []
@@ -64,12 +34,6 @@ def tokenise(source_code : str) -> list:
     if str_buffer != []:
         tokens.append("".join(str_buffer))
     return tokens
-
-class SyntaxError(Exception):
-    pass
-
-class OverflowError(Exception):
-    pass
 
 def build_opcode(ops):
     if len(ops) == 4:
@@ -115,7 +79,9 @@ class Assembler:
 # private implementation functions.
 
     def next_token(self):
-        self.ctk = self.tokens[self.token_index]
+        self.token_index += 1
+        if self.token_index < len(self.tokens):
+            self.ctk = self.tokens[self.token_index]
 
     def assemble_r2r(self, op1, op2):
         self.token_index += 1
@@ -136,7 +102,8 @@ class Assembler:
     def assemble_cg(self, op1):
         self.token_index += 1
         if self.tokens[self.token_index] in self.symbol_table:
-            for t, v in self.symbol_table[self.tokens[self.token_index]]:
+            # Take a copy of the symbol table to prevent an infinite loop
+            for t, v in self.symbol_table[self.tokens[self.token_index]][:]:
                 if t == "label":
                     # The symbol was encountered earlier in the binary as a jump destination
                     opcode = build_opcode((op1, v))
@@ -185,34 +152,6 @@ class Assembler:
         self.opcodes.append(opcode)
         return
     
-    def assemble_dir(self):
-        self.next_token()
-        if self.ctk in self.symbol_table:
-            # encountered by an earlier smp op.
-            value = self.symbol_table[self.ctk][1]
-            self.next_token()
-            if not c16u.is_hex(self.ctk):
-                raise SyntaxError()
-            # Write the address of the current top of opcode stack to the opcode of the previous 
-            self.opcodes[value] &= np.uint16(0xF000)
-            self.opcodes[value] |= np.uint16(c16u.to_hex(self.ctk))
-        else:
-            assert (
-                self.ctk not in register_mnemonics
-                    and self.ctk not in device_mnemonics
-                    and self.ctk not in opcode_mnemonics
-                    and self.ctk not in self.symbol_table
-            )
-            label = self.ctk
-            self.next_token()
-            if not c16u.is_hex(self.ctk):
-                raise SyntaxError()
-            segments = c16u.to_words(c16u.to_hex(self.ctk))
-            self.symbol_table[self.ctk] = [("data", 2*len(self.opcodes))]
-            for segment in segments:
-                self.opcodes.append(segment)
-        return
-    
     def assemble_drw(self, op1):
         self.token_index += 1
         if self.tokens[self.token_index] not in device_mnemonics:
@@ -228,7 +167,7 @@ class Assembler:
         opcode = build_opcode((op1, dev, const))
         self.opcodes.append(opcode)
         return
-    
+
     def assemble_mem(self, op1, op2):
         self.token_index += 1
         if self.tokens[self.token_index] not in register_mnemonics:
@@ -294,6 +233,14 @@ class Assembler:
     def assemble_cpac(self):
         self.assemble_const(0xB)
 
+    def assemble_db(self):
+        self.next_token()
+        if not c16u.is_hex(self.ctk):
+            raise SyntaxError()
+        words = c16u.to_words(c16u.to_hex(self.ctk))
+        self.opcodes += words
+        return
+
     def assemble_dpg(self):
         self.assemble_dp(0x01)
     
@@ -314,11 +261,11 @@ class Assembler:
                     self.opcodes[value >> 1] &= np.uint16(0xF000)
                     if 2*len(self.opcodes) > 0xFFE:
                         raise OverflowError()
-                    self.opcodes[value >> 1] |= np.uint16(2*len(self.opcodes) + 2)
+                    self.opcodes[value >> 1] |= np.uint16(2*len(self.opcodes))
         else:
             # label is referenced later.
-            self.symbol_table[self.tokens[self.token_index]] = [("label", np.uint16(2*len(self.opcodes) + 2))]
-
+            self.symbol_table[self.tokens[self.token_index]] = [("label", np.uint16(2*len(self.opcodes)))]
+        # Skip the ':' character at the end of the label.
         self.token_index += 1
 
     def assemble_ld(self):
@@ -382,86 +329,56 @@ class Assembler:
         self.assemble_r2r(0x8, 0x3)
 
     def assemble(self):
+        opcode_mnemonics = {
+            "acr" : self.assemble_acr,
+            "adc" : self.assemble_adc,
+            "add" : self.assemble_add,
+            "and" : self.assemble_and,
+            "ar" : self.assemble_ar,
+            "bar" : self.assemble_bar,
+            "call" : self.assemble_call,
+            "cpac" : self.assemble_cpac,
+            "db" : self.assemble_db,
+            "dpg" : self.assemble_dpg,
+            "dps" : self.assemble_dps,
+            "goto" : self.assemble_goto,
+            "hlt" : self.assemble_hlt,
+            "ld" : self.assemble_ld,
+            "mpar" : self.assemble_mpar,
+            "or" : self.assemble_or,
+            "rdb" : self.assemble_rdb,
+            "ret" : self.assemble_ret,
+            "rmp" : self.assemble_rmp,
+            "rsub" : self.assemble_rsub,
+            "shl" : self.assemble_shl,
+            "shr" : self.assemble_shr,
+            "smp" : self.assemble_smp,
+            "snec" : self.assemble_snec,
+            "snuec" : self.assemble_snuec,
+            "sne" : self.assemble_sne,
+            "snue" : self.assemble_snue,
+            "spl" : self.assemble_spl,
+            "sub" : self.assemble_sub,
+            "wrb" : self.assemble_wrb,
+            "xch" : self.assemble_xch,
+            "xor" : self.assemble_xor
+        }
         # keep the code length at the beginning of the program code
         # so reserve the slot at the beginning.
-        self.opcodes.append(np.uint16(0))
+        # self.opcodes.append(np.uint16(0))
         while self.token_index < len(self.tokens):
-            if self.tokens[self.token_index] == "adc":
-                self.assemble_adc()
-            elif self.tokens[self.token_index] == "add":
-                self.assemble_add()
-            elif self.tokens[self.token_index] == "and":
-                self.assemble_and()
-            elif self.tokens[self.token_index] == "ar":
-                self.assemble_ar()
-            elif self.tokens[self.token_index] == "acr":
-                self.assemble_acr()
-            elif self.tokens[self.token_index] == "bar":
-                self.assemble_bar()
-            elif self.tokens[self.token_index] == "call":
-                self.assemble_call()
-            elif self.tokens[self.token_index] == "cpac":
-                self.assemble_cpac()
-            elif self.tokens[self.token_index] == "dpg":
-                self.assemble_dpg()
-            elif self.tokens[self.token_index] == "dps":
-                self.assemble_dps()
-            elif self.tokens[self.token_index] == "goto":
-                self.assemble_goto()
-            elif self.tokens[self.token_index] == "hlt":
-                self.assemble_hlt()
-            elif self.tokens[self.token_index] == "ld":
-                self.assemble_ld()
-            elif self.tokens[self.token_index] == "mpar":
-                self.assemble_mpar()
-            elif self.tokens[self.token_index] == "or":
-                self.assemble_or()
-            elif self.tokens[self.token_index] == "rdb":
-                self.assemble_rdb()
-            elif self.tokens[self.token_index] == "ret":
-                self.assemble_ret()
-            elif self.tokens[self.token_index] == "rmp":
-                self.assemble_rmp()
-            elif self.tokens[self.token_index] == "rsub":
-                self.assemble_rsub()
-            elif self.tokens[self.token_index] == "shl":
-                self.assemble_shl()
-            elif self.tokens[self.token_index] == "shr":
-                self.assemble_shr()
-            elif self.tokens[self.token_index] == "smp":
-                self.assemble_smp()
-            elif self.tokens[self.token_index] == "snec":
-                self.assemble_snec()
-            elif self.tokens[self.token_index] == "snuec":
-                self.assemble_snuec()
-            elif self.tokens[self.token_index] == "sne":
-                self.assemble_sne()
-            elif self.tokens[self.token_index] == "snue":
-                self.assemble_snue()
-            elif self.tokens[self.token_index] == "spl":
-                self.assemble_spl()
-            elif self.tokens[self.token_index] == "sub":
-                self.assemble_sub()
-            elif self.tokens[self.token_index] == "wrb":
-                self.assemble_wrb()
-            elif self.tokens[self.token_index] == "xch":
-                self.assemble_xch()
-            elif self.tokens[self.token_index] == "xor":
-                self.assemble_xor()
+            if self.ctk in opcode_mnemonics:
+                opcode_mnemonics[self.ctk]()
             else:
                 if self.tokens[self.token_index + 1] == ":":
                     self.assemble_label()
-                elif self.tokens[self.token_index] == ".":
-                    self.assemble_dir()
                 else:
-                    print(self.tokens[self.token_index])
                     raise SyntaxError()
-            self.token_index += 1
-        self.opcodes[0] = np.uint16(2*len(self.opcodes) - 2)
+            self.next_token()
+        # self.opcodes[0] = np.uint16(2*len(self.opcodes) - 2)
 
     def write_out(self):
         with open(self.out_file, "wb") as of:
-            out_bytes = []
             for i in self.opcodes:
                 of.write(bytearray([np.uint8(c16u.high_byte(i)), np.uint8(c16u.low_byte(i))]))
 

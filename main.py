@@ -1,4 +1,6 @@
 import chip64
+import numpy as np
+
 code1 = [
 # data section
     0x10, 0x0A, # jump to main
@@ -39,6 +41,9 @@ code1 = [
     0x00, 0x00  # halt execution
 ]
 
+code = []
+with open("pe002.crm", "rb") as fout:
+    code = [np.uint8(i) for i in fout.read()]
 
 c64 = chip64.Chip64(code)
 c64.execute()

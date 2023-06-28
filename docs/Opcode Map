@@ -1,0 +1,32 @@
+Opcode Map
+
+Opcode
+hlt - 0000
+ret - 01EE
+goto - 1NNN
+call - 2NNN
+snec - 3XNN
+snuec - 4XNN
+sne - 5XY0
+acr - 6XNN
+adc - 7XNN
+ar - 8XY0
+or - 8XY1
+and - 8XY2
+xor - 8XY3
+add - 8XY4
+sub - 8XY5
+shr - 8XY6
+rsub - 8XY7
+shl - 8XYE
+snue - 9XY0
+smp - ANNN
+cpac - BNNN
+bar - CXNN
+rdb - DXNN
+dpg - EX01
+dps - EX00
+mpar - EX1E
+spl - EX55
+ld - EX65
+wrb - FXNN

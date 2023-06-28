@@ -374,7 +374,7 @@ class Chip64:
                 device = c16u.get_nibble(opcode, 2)
                 values = self.memory[self.memory_ptr: self.memory_ptr + c16u.low_byte(opcode)]
                 self.devices[device].write(values)
-                nib0 = c16u.get_nibble(opcode, 0)
+                # nib0 = c16u.get_nibble(opcode, 0)
 
             if code_ptr_increment_flag:
                 self.code_ptr += 2

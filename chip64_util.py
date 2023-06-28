@@ -34,8 +34,10 @@ def get_nibble(value: np.uint16, n: int) -> np.uint16:
     """
     return np.uint16((value & (0xF << (4 * n))) >> (4 * n))
 
+
 def to_hex(string : str) -> int:
     return int(string, 16)
+
 
 def is_hex(string: str) -> bool:
     """
@@ -59,6 +61,7 @@ def split(value: np.uint64) -> list:
         value >>= np.uint16(8)
     return list(reversed(rv))
 
+
 def to_words(value : int) -> list:
     """
     Splits an integer into its composite words and returns them in big endian manner.
@@ -68,6 +71,7 @@ def to_words(value : int) -> list:
         rv.append(np.uint16(value & np.uint16(0xFFFF)))
         value >>= np.uint16(16)
     return list(reversed(rv))
+
 
 def build_uint64(byte_list: list) -> np.uint64:
     """
