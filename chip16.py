@@ -186,6 +186,17 @@ class Chip16:
         self.R[dest] >>= np.uint16(srcv)
     
 
+    def rsub(self, dest : int, src : int) -> None:
+        """
+        Implememts the rsub instruction.
+        Sets R[dest] = R[src] - R[dest] setting the no-borrow flag if needed.
+        """
+        assert 0 <= dest < 16 and 0 <= src < 16
+        self.R[0xF] = np.uint16(self.R[src] >= self.R[dest])
+        self.R[dest] = self.R[src] - self.R[dest]
+
+    
+
     def shl(self, dest : int, srcv : np.uint8) -> None:
         """
         Implements the shl instruction.
@@ -278,10 +289,6 @@ class Chip16:
                 self.ram[self.code_ptr], self.ram[self.code_ptr + 1]
             )
             code_ptr_increment_flag = True
-
-
-                continue
-            
             if nib0 == 0:
                 if opcode == 0x0000:
                     # hlt opcode
@@ -337,8 +344,8 @@ class Chip16:
                         c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
                     )
                 elif nib0 == 7:
-                    self.sub(
-                        c16u.get_nibble(opcode, 1), c16u.get_nibble(opcode, 2)
+                    self.rsub(
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
                     )
                 elif nib0 == 0xE:
                     self.shl(
