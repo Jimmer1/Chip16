@@ -51,7 +51,6 @@ There are two opcodes for assigning values to registers.
 
 AR - 8XY0  
 ACR - 6XNN  
-XCH - 8XYF
 
 AR copies the value from register Y into register X. This is demonstrated below:
 
@@ -70,8 +69,6 @@ code = [
     0x6F, 0x2a # register[0xF] = 42
 ]
 ```
-
-XCH exchanges the values of rX and rY.
 
 ### How to perform numeric arithmetic.
 
@@ -146,7 +143,7 @@ code = [
 ]
 ```
 
-SHL shifts register X left by Y places where Y in this instance represents a 4 bit encoded constant. The flag register is modified to hold the (64-Y)th bit in the destination register before the shift.
+SHL shifts register X left by Y places where Y in this instance represents a 4 bit encoded constant. The flag register is modified to hold the (16-Y)th bit in the destination register before the shift.
 The SHL instruction is demonstrated below:
 
 ```python

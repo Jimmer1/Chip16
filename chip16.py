@@ -279,19 +279,18 @@ class Chip16:
             )
             code_ptr_increment_flag = True
 
-            if opcode == 0x0000:
-                # hlt opcode
-                return
-            elif opcode == 0x01EE:
-                self.ret()
-                self.code_ptr += 2
+
                 continue
             
-            nib3, nib2, nib1, nib0 = c16u.get_nibble(opcode, 3),
-                c16u.get_nibble(opcode, 2),
-                c16u.get_nibble(opcode, 1),
-                c16u.get_nibble(opcode, 0)
-            if nib3 == 1:
+            if nib0 == 0:
+                if opcode == 0x0000:
+                    # hlt opcode
+                    return
+                elif opcode == 0x01EE:
+                    self.ret()
+                    self.code_ptr += 2
+
+            elif nib3 == 1:
                 self.goto(np.uint16(opcode & 0xFFF))
                 code_ptr_increment_flag = False
             elif nib3 == 2:
@@ -307,7 +306,44 @@ class Chip16:
                 self.acr(c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1))
             elif nib3 == 7:
                 self.adc(c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1))
-            
+            elif nib3 == 8:
+                nib0 = c16u.get_nibble(opcode, 0)
+                if nib0 == 0:
+                    self.ar(
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
+                    )
+                elif nib0 == 1:
+                    self.bit_or(
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
+                    )
+                elif nib0 == 2:
+                    self.bit_and(
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
+                    )
+                elif nib0 == 3:
+                    self.bit_xor(
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
+                    )
+                elif nib0 == 4:
+                    self.add(
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
+                    )
+                elif nib0 == 5:
+                    self.sub(
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
+                    )
+                elif nib0 == 6:
+                    self.shr(
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
+                    )
+                elif nib0 == 7:
+                    self.sub(
+                        c16u.get_nibble(opcode, 1), c16u.get_nibble(opcode, 2)
+                    )
+                elif nib0 == 0xE:
+                    self.shl(
+                        c16u.get_nibble(opcode, 2), c16u.get_nibble(opcode, 1)
+                    )
 
             elif nib3 == 9:
                 self.snue(
@@ -320,3 +356,32 @@ class Chip16:
                 code_ptr_increment_flag = False
             elif nib3 == 0xC:
                 self.bar(c16u.get_nibble(opcode, 2), c16u.low_byte(opcode))
+            
+            elif nib3 == 0xE:
+                lb = c16u.low_byte(opcode)
+                if lb == 0x0:
+                    self.devices[
+                        c16u.get_nibble(opcode, 2)
+                    ].set_ptr(self.R[0xF])
+                elif lb == 0x1:
+                    self.R[0xF] = self.devices[
+                        c16u.get_nibble(opcode, 2)
+                    ].get_ptr()
+                elif lb == 0x1E:
+                    self.mpar(c16u.get_nibble(opcode, 2))
+                elif lb == 0x55:
+                    self.spl(c16u.get_nibble(opcode, 2))
+                elif lb == 0x65:
+                    self.ldr(c16u.get_nibble(opcode, 2))
+            elif nib3 == 0xF:
+                self.devices[
+                    c16u.get_nibble(opcode, 2)
+                ].write(self.ram[self.I : self.I + c16u.low_byte(opcode)])
+            else:
+                self.alert = True
+            
+            if code_ptr_increment_flag:
+                self.code_ptr += 2
+            
+            if num_of_cycles is not None:
+                num_of_cycles -= 1
