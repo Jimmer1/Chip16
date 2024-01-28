@@ -37,7 +37,7 @@ class Chip16:
             raise SizeError()
         for i, byte in enumerate(code):
             self.memory[i] = byte
-        self.devices = devices
+        self.devices = devices + [None]*(16 - len(devices))
     
 
     def reset(self):
