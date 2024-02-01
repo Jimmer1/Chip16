@@ -369,9 +369,9 @@ class Chip16:
                 if lb == 0x0:
                     self.devices[
                         c16u.get_nibble(opcode, 2)
-                    ].set_ptr(self.R[0xF])
+                    ].set_ptr(self.R[0xE])
                 elif lb == 0x1:
-                    self.R[0xF] = self.devices[
+                    self.R[0xE] = self.devices[
                         c16u.get_nibble(opcode, 2)
                     ].get_ptr()
                 elif lb == 0x1E:
