@@ -18,6 +18,9 @@ deviceList = [
 
 defaultDevices = deviceList + [None]*(16 - len(deviceList))
 
+def real_time(cycles, hertz=10**6):
+    return cycles/hertz
+
 class Chip16:
     """
     The main class for the chip16 emulator.
@@ -38,6 +41,7 @@ class Chip16:
         for i, byte in enumerate(code):
             self.memory[i] = byte
         self.devices = devices + [None]*(16 - len(devices))
+        self.cycles = 0
     
 
     def reset(self):
@@ -53,6 +57,7 @@ class Chip16:
         Returns from subroutine.
         """
         self.code_ptr = self.stack.pop()
+        self.cycles += 2
 
     
     def goto(self, address : np.uint16) -> None:
@@ -62,6 +67,7 @@ class Chip16:
         """
         assert 0 <= address < 4096
         self.code_ptr = address
+        self.cycles += 1
 
     
     def call(self, address : np.uint16) -> None:
@@ -73,6 +79,7 @@ class Chip16:
         assert 0 <= address < 4096
         self.stack.append(self.code_ptr)
         self.code_ptr = address
+        self.cycles += 3
     
     
     def snec(self, index : int, const : np.uint8) -> None:
@@ -83,6 +90,7 @@ class Chip16:
         assert 0 <= index < 16
         if self.R[index] == constant:
             self.code_ptr += 2
+        self.cycles += 2
     
 
     def snuec(self, index : int, const : np.uint8) -> None:
@@ -93,6 +101,7 @@ class Chip16:
         assert 0 <= index < 16
         if self.R[index] != constant:
             self.code_ptr += 2
+        self.cycles += 2
     
 
     def sne(self, dest : int, src : int) -> None:
@@ -103,6 +112,7 @@ class Chip16:
         assert 0 <= dest < 16 and 0 <= src < 16
         if self.R[dest] == self.R[src]:
             self.code_ptr += 2
+        self.cycles += 2
     
 
     def acr(self, dest : int, const : np.uint8) -> None:
@@ -112,6 +122,7 @@ class Chip16:
         """
         assert 0 <= dest < 16
         self.R[dest] = np.uint16(const)
+        self.cycles += 1
     
 
     def adc(self, dest : int, const : np.uint8) -> None:
@@ -121,6 +132,7 @@ class Chip16:
         """
         assert 0 <= dest < 16
         self.R[dest] += np.uint16(const)
+        self.cycles += 1
     
 
     def bit_or(self, dest : int, src : int) -> None:
@@ -130,6 +142,7 @@ class Chip16:
         """
         assert 0 <= dest < 16 and 0 <= src < 16
         self.R[dest] |= self.R[src]
+        self.cycles += 1
     
 
     def bit_and(self, dest : int, src : int) -> None:
@@ -139,6 +152,7 @@ class Chip16:
         """
         assert 0 <= dest < 16 and 0 <= src < 16
         self.R[dest] &= self.R[src]
+        self.cycles += 1
     
 
     def bit_xor(self, dest : int, src : int) -> None:
@@ -148,6 +162,7 @@ class Chip16:
         """
         assert 0 <= dest < 16 and 0 <= src < 16
         self.R[dest] ^= self.R[src]
+        self.cycles += 1
     
 
     def add(self, dest : int, src : int) -> None:
@@ -159,6 +174,7 @@ class Chip16:
         tmp = self.R[dest] + self.R[src]
         self.R[0xF] = np.uint16(tmp < self.R[dest])
         self.R[dest] = np.uint16(tmp)
+        self.cycles += 1
     
 
     def sub(self, dest : int, src : int) -> None:
@@ -169,6 +185,7 @@ class Chip16:
         assert 0 <= dest < 16 and 0 <= src < 16
         self.R[0xF] = np.uint16(self.R[dest] >= self.R[src])
         self.R[dest] -= self.R[src]
+        self.cycles += 1
     
 
     def shr(self, dest : int, srcv : np.uint8) -> None:
@@ -184,6 +201,7 @@ class Chip16:
         tmp = self.R[dest] & np.uint16(1 << (srcv - 1))       
         self.R[0xF] = np.uint16(tmp != 0)
         self.R[dest] >>= np.uint16(srcv)
+        self.cycles += 1
     
 
     def rsub(self, dest : int, src : int) -> None:
@@ -194,6 +212,7 @@ class Chip16:
         assert 0 <= dest < 16 and 0 <= src < 16
         self.R[0xF] = np.uint16(self.R[src] >= self.R[dest])
         self.R[dest] = self.R[src] - self.R[dest]
+        self.cycles += 1
 
     
 
@@ -210,6 +229,7 @@ class Chip16:
         tmp = self.R[dest] & np.uint16(1 << (16 - src_value))
         self.R[0xF] = np.uint16(tmp != 0)
         self.R[dest] <<= np.uint16(srcv)
+        self.cycles += 1
     
 
     def snue(self, dest : int, src : int) -> None:
@@ -220,6 +240,7 @@ class Chip16:
         assert 0 <= dest < 16 and 0 <= src < 16
         if self.R[dest] != self.R[src]:
             self.code_ptr += 2
+        self.cycles += 2
 
 
     def smp(self, address : np.uint16) -> None:
@@ -229,6 +250,7 @@ class Chip16:
         """
         assert 0 <= address < 4096
         self.memory_ptr = value
+        self.cycles += 1
     
 
     def cpac(self, const : np.uint8) -> None:
@@ -237,6 +259,7 @@ class Chip16:
         Sets code_ptr = R[0] + const
         """
         self.code_ptr = self.R[0] + np.uint16(const)
+        self.cycles += 2
     
 
     def bar(self, dest, const : np.uint8) -> None:
@@ -246,6 +269,7 @@ class Chip16:
         """
         assert 0 <= dest < 255
         self.R[dest] = np.uint16(random.randint(0, 255)) & np.uint16(const)
+        self.cycles += 16
     
 
     def mpar(self, index : int) -> None:
@@ -255,6 +279,7 @@ class Chip16:
         """
         assert 0 <= index < 16
         self.memory_ptr += self.R[index]
+        self.cycles += 1
 
     
     def spl(self, index : int) -> None:
@@ -267,6 +292,7 @@ class Chip16:
             c16u.low_byte(self.R[index])
         self.ram[self.I] = hi
         self.ram[self.I + 1] = lo
+        self.cycles += 3
     
 
     def ldr(self, index : int) -> None:
@@ -277,14 +303,15 @@ class Chip16:
         assert 0 <= index < 16 and 0 <= self.I < len(self.ram)-1
         hi, lo = self.ram[self.I], self.ram[self.I + 1]
         self.R[index] = np.uint16((hi << 8) | lo)
+        self.cycles += 3
 
-    def execute(self, num_of_cycles=None) -> None:
+    def execute(self, num_of_ops=None) -> None:
         """
         The main decode/execute loop of the emulator.
         num_of_cycles gives the number of cycles the emulator will run for
         if nothing is specified the emulator will cycle until a hlt is reached.
         """
-        while num_of_cycles > 0 or num_of_cycles is None:
+        while num_of_ops > 0 or num_of_ops is None:
             opcode = c16u.concat(
                 self.ram[self.code_ptr], self.ram[self.code_ptr + 1]
             )
@@ -390,5 +417,6 @@ class Chip16:
             if code_ptr_increment_flag:
                 self.code_ptr += 2
             
-            if num_of_cycles is not None:
-                num_of_cycles -= 1
+            if num_of_ops is not None:
+                num_of_ops -= 1
+        print("Program Execution took: {} cycles, {} real seconds.".format(self.cycles, real_time(self.cycles)))
